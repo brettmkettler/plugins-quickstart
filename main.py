@@ -1,56 +1,67 @@
-import json
+# <add key="apiUrl" value="https://rydersystemsdev.service-now.com/api/now/table/incident" />
+# <add key="username" value="AppDynamicAlert" />
+# <add key="password" value="appdynamics01" />
 
-import quart
-import quart_cors
-from quart import request
+import os
+from flask import Flask, request, jsonify, send_from_directory
+import requests
 
-app = quart_cors.cors(quart.Quart(__name__), allow_origin="https://chat.openai.com")
+app = Flask(__name__)
 
-# Keep track of todo's. Does not persist if Python session is restarted.
-_TODOS = {}
+def get_incident_info(service_now_uri, username, password, incident_number):
+    url = f"{service_now_uri}/api/now/table/incident"
+    headers = {
+        "Content-Type": "application/json",
+        "Accept": "application/json"
+    }
+    auth = (username, password)
+    params = {
+        "sysparm_query": f"number={incident_number}"
+    }
 
-@app.post("/todos/<string:username>")
-async def add_todo(username):
-    request = await quart.request.get_json(force=True)
-    if username not in _TODOS:
-        _TODOS[username] = []
-    _TODOS[username].append(request["todo"])
-    return quart.Response(response='OK', status=200)
+    response = requests.get(url, headers=headers, auth=auth, params=params)
 
-@app.get("/todos/<string:username>")
-async def get_todos(username):
-    return quart.Response(response=json.dumps(_TODOS.get(username, [])), status=200)
+    if response.status_code == 200:
+        result = response.json()
+        incident = result["result"][0]  # Assuming only one incident is returned
+        return incident
+    else:
+        raise Exception(f"Error: {response.status_code}, {response.text}")
 
-@app.delete("/todos/<string:username>")
-async def delete_todo(username):
-    request = await quart.request.get_json(force=True)
-    todo_idx = request["todo_idx"]
-    # fail silently, it's a simple plugin
-    if 0 <= todo_idx < len(_TODOS[username]):
-        _TODOS[username].pop(todo_idx)
-    return quart.Response(response='OK', status=200)
+
+@app.route('/get-incident', methods=['POST'])
+def get_incident():
+    data = request.get_json()
+    service_now_uri = data.get('service_now_uri')
+    username = data.get('username')
+    password = data.get('password')
+    incident_number = data.get('incident_number')
+
+    try:
+        incident_info = get_incident_info(service_now_uri, username, password, incident_number)
+        return jsonify(incident_info)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
+
+#########################################################
 
 @app.get("/logo.png")
 async def plugin_logo():
     filename = 'logo.png'
-    return await quart.send_file(filename, mimetype='image/png')
+    return send_from_directory('.',
+                               'logo.png',
+                               mimetype='image/png')
 
-@app.get("/.well-known/ai-plugin.json")
-async def plugin_manifest():
-    host = request.headers['Host']
-    with open("./.well-known/ai-plugin.json") as f:
-        text = f.read()
-        return quart.Response(text, mimetype="text/json")
+@app.route('/.well-known/ai-plugin.json')
+def serve_ai_plugin():
+  return send_from_directory('.',
+                             'ai-plugin.json',
+                             mimetype='application/json')
 
-@app.get("/openapi.yaml")
-async def openapi_spec():
-    host = request.headers['Host']
-    with open("openapi.yaml") as f:
-        text = f.read()
-        return quart.Response(text, mimetype="text/yaml")
 
-def main():
-    app.run(debug=True, host="0.0.0.0", port=5003)
+@app.route('/.well-known/openapi.yaml')
+def serve_openapi_yaml():
+  return send_from_directory('.', 'openapi.yaml', mimetype='text/yaml')
 
-if __name__ == "__main__":
-    main()
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=5003)
