@@ -1,12 +1,19 @@
-# <add key="apiUrl" value="https://rydersystemsdev.service-now.com/api/now/table/incident" />
-# <add key="username" value="AppDynamicAlert" />
-# <add key="password" value="appdynamics01" />
-
+#
+#
+#
+# apiUrl: https://rydersystemsdev.service-now.com
+# username: AppDynamicAlert
+# password: appdynamics01
+  
 import os
-from flask import Flask, request, jsonify, send_from_directory
+from flask import Flask, Response, request, jsonify, send_from_directory
+from flask_cors import CORS
 import requests
+import yaml
+import json
 
 app = Flask(__name__)
+CORS(app)
 
 def get_incident_info(service_now_uri, username, password, incident_number):
     url = f"{service_now_uri}/api/now/table/incident"
@@ -44,24 +51,27 @@ def get_incident():
         return jsonify({"error": str(e)}), 400
 
 #########################################################
-
 @app.get("/logo.png")
-async def plugin_logo():
-    filename = 'logo.png'
-    return send_from_directory('.',
-                               'logo.png',
-                               mimetype='image/png')
+def plugin_logo():
+    return send_from_directory('.', 'logo.png')
 
 @app.route('/.well-known/ai-plugin.json')
-def serve_ai_plugin():
-  return send_from_directory('.',
-                             'ai-plugin.json',
-                             mimetype='application/json')
+def serve_manifest():
+    return send_from_directory('.', 'ai-plugin.json')
 
 
-@app.route('/.well-known/openapi.yaml')
+@app.route('/openapi.yaml')
 def serve_openapi_yaml():
-  return send_from_directory('.', 'openapi.yaml', mimetype='text/yaml')
+    with open('openapi.yaml', 'r') as f:
+        yaml_data = f.read()
+    return Response(yaml_data, mimetype='text/yaml')
+
+@app.route('/ai-plugin.json')
+def serve_openapi_json():
+    with open('ai-plugin.json', 'r') as f:
+        json_data = json.load(f)
+    return jsonify(json_data)
+
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5003)

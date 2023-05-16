@@ -1,93 +1,69 @@
-openapi: 3.0.1
+openapi: 3.0.3
 info:
-  title: TODO Plugin
-  description: A plugin that allows the user to create and manage a TODO list using ChatGPT. If you do not know the user's username, ask them first before making queries to the plugin. Otherwise, use the username "global".
-  version: 'v1'
+  title: ServiceNow Incident Plugin
+  description: A plugin that retrieves incident information from ServiceNow.
+  version: 1.0.0
 servers:
   - url: http://localhost:5003
 paths:
-  /todos/{username}:
-    get:
-      operationId: getTodos
-      summary: Get the list of todos
-      parameters:
-      - in: path
-        name: username
-        schema:
-            type: string
+  /get-incident:
+    post:
+      operationId: submitIncident
+      summary: Retrieve incident information
+      requestBody:
         required: true
-        description: The name of the user.
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GetIncidentRequest'
       responses:
-        "200":
-          description: OK
+        '200':
+          description: Successful response
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/getTodosResponse'
-    post:
-      operationId: addTodo
-      summary: Add a todo to the list
-      parameters:
-      - in: path
-        name: username
-        schema:
-            type: string
-        required: true
-        description: The name of the user.
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/addTodoRequest'
-      responses:
-        "200":
-          description: OK
-    delete:
-      operationId: deleteTodo
-      summary: Delete a todo from the list
-      parameters:
-      - in: path
-        name: username
-        schema:
-            type: string
-        required: true
-        description: The name of the user.
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/deleteTodoRequest'
-      responses:
-        "200":
-          description: OK
-
+                $ref: '#/components/schemas/IncidentResponse'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
 components:
   schemas:
-    getTodosResponse:
+    GetIncidentRequest:
       type: object
       properties:
-        todos:
-          type: array
-          items:
-            type: string
-          description: The list of todos.
-    addTodoRequest:
-      type: object
-      required:
-      - todo
-      properties:
-        todo:
+        service_now_uri:
           type: string
-          description: The todo to add to the list.
-          required: true
-    deleteTodoRequest:
+          description: 'The ServiceNow URI, it should be in this format https://rydersystemsdev.service-now.com'
+        username:
+          type: string
+          description: The API username for authentication.
+        password:
+          type: string
+          description: The API password for authentication.
+        incident_number:
+          type: string
+          description: The number of the incident to retrieve.
+    IncidentResponse:
       type: object
-      required:
-      - todo_idx
       properties:
-        todo_idx:
-          type: integer
-          description: The index of the todo to delete.
-          required: true
+        incident_number:
+          type: string
+          description: The incident number.
+        short_description:
+          type: string
+          description: A brief description of the incident.
+        status:
+          type: string
+          description: The status of the incident.
+        assigned_to:
+          type: string
+          description: The person or group assigned to the incident.
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+          description: The error message.
