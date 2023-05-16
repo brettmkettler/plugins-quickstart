@@ -1,9 +1,8 @@
-#
-#
-#
 # apiUrl: https://rydersystemsdev.service-now.com
 # username: AppDynamicAlert
 # password: appdynamics01
+# incidentNumber:  INC1280089
+
   
 import os
 from flask import Flask, Response, request, jsonify, send_from_directory
@@ -23,7 +22,9 @@ def get_incident_info(service_now_uri, username, password, incident_number):
     }
     auth = (username, password)
     params = {
-        "sysparm_query": f"number={incident_number}"
+        "sysparm_query": f"number={incident_number}",
+        #"sysparm_display_value": "true"
+        #"sysparm_exclude_reference_link": "true"
     }
 
     response = requests.get(url, headers=headers, auth=auth, params=params)
@@ -31,9 +32,23 @@ def get_incident_info(service_now_uri, username, password, incident_number):
     if response.status_code == 200:
         result = response.json()
         incident = result["result"][0]  # Assuming only one incident is returned
+
+        # Extract work notes and comments
+        work_notes = []
+        comments = []
+        for entry in incident.get("work_notes", []):
+            work_notes.append(entry.get("value"))
+        for entry in incident.get("comments", []):
+            comments.append(entry.get("value"))
+
+        # Add work notes and comments to incident information
+        incident["work_notes"] = work_notes
+        incident["comments"] = comments
+
         return incident
     else:
         raise Exception(f"Error: {response.status_code}, {response.text}")
+
 
 
 @app.route('/get-incident', methods=['POST'])

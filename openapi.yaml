@@ -36,7 +36,7 @@ components:
       properties:
         service_now_uri:
           type: string
-          description: 'The ServiceNow URI, it should be in this format https://rydersystemsdev.service-now.com'
+          description: The ServiceNow URI, it should be in this format https://rydersystemsdev.service-now.com
         username:
           type: string
           description: The API username for authentication.
@@ -61,6 +61,16 @@ components:
         assigned_to:
           type: string
           description: The person or group assigned to the incident.
+        work_notes:
+          type: array
+          items:
+            type: string
+          description: The work notes related to the incident, provide a detailed summary.
+        comments:
+          type: array
+          items:
+            type: string
+          description: The comments related to the incident, provide a detailed summary.
     Error:
       type: object
       properties:
