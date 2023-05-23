@@ -15,7 +15,8 @@ app = Flask(__name__)
 CORS(app)
 
 def get_incident_info(service_now_uri, username, password, incident_number):
-    url = f"{service_now_uri}/api/now/table/incident"
+    #url = f"{service_now_uri}/api/now/table/incident"
+    url = f"https://rydersystemsdev.service-now.com/api/now/table/incident"
     headers = {
         "Content-Type": "application/json",
         "Accept": "application/json"
@@ -55,8 +56,10 @@ def get_incident_info(service_now_uri, username, password, incident_number):
 def get_incident():
     data = request.get_json()
     service_now_uri = data.get('service_now_uri')
-    username = data.get('username')
-    password = data.get('password')
+    #username = data.get('username')
+    #password = data.get('password')
+    username = "AppDynamicAlert"
+    password = "appdynamics01"
     incident_number = data.get('incident_number')
 
     try:
