@@ -62,7 +62,7 @@ def get_incident_info(service_now_uri, username, password, incident_number):
             recommendation = response
 
             # Add recommendation to incident information
-            incident["recommendation"] = recommendation
+            incident["INCIDENT RECOMMENDATIONS: "] = recommendation
 
             return incident
         else:
