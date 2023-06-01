@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: ServiceNow Incident Plugin
-  description: A plugin that retrieves incident information from ServiceNow.
+  description: A plugin that retrieves incident information and can create incidents ServiceNow.
   version: 1.0.0
 servers:
   - url: http://localhost:5003
