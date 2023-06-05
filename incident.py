@@ -1,19 +1,23 @@
-import os
-from flask import Flask, Response, request, jsonify, send_from_directory
-from flask_cors import CORS
-from sentence_transformers import SentenceTransformer
 import requests
-import yaml
 import json
-import openai
-import numpy as np
 import spacy
+import openai
+import os
 
 openai.api_key = "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"
 
+# ServiceNow API credentials
+instance = "rydersystemsdev"
+username = "AppDynamicAlert"
+password = "appdynamics01"
 
-app = Flask(__name__)
-CORS(app)
+# Search query parameters
+table = "incident"  # The table to search in, e.g., "incident", "problem", "change_request"
+
+
+############################
+
+
 
 
 def get_incident_info(service_now_uri, username, password, incident_number):
@@ -46,17 +50,11 @@ def get_incident_info(service_now_uri, username, password, incident_number):
             # Search for recommendations using description
             description = incident.get("short_description", "")
             #print("Short Description: " + description)
-            relevantinfo = search_service_now(service_now_uri, username, password, description)
-            
-            #format list to json
-            relevantinfo = json.dumps(relevantinfo)
-            
-            #format json to string
-            
-            
+            recommendations = search_service_now(service_now_uri, username, password, description)
+
 
             incident_prompt = (
-                "You are a helpful AI Assistant named Gemi. How would you help resolve this incident given the incident description, work notes, comments, and relevant incident details, please provide a very detailed 2 paragraph recommending a solution to this incident based on the information given below: "
+                "Given the incident description, work notes, comments, and relevant incident details, please provide a very detailed recommended solution and person of contact or assignment group that has resolved incident in past: "
                 + "\n"
                 + "Incident Description: "
                 + description
@@ -68,12 +66,10 @@ def get_incident_info(service_now_uri, username, password, incident_number):
                 + str(comments)
                 + "\n"
                 + "Relevant Incident details: "
-                + str(relevantinfo)
+                + str(recommendations)
                 + "\n"
                 + "\nRecommendation:"
             )
-            
-            print("Incident Prompt: " + incident_prompt)
 
             # Generate recommendation using OpenAI
             response = openai.Completion.create(
@@ -82,14 +78,14 @@ def get_incident_info(service_now_uri, username, password, incident_number):
                 max_tokens=1000,
                 n=1,
                 stop=None,
-                temperature=0.3
+                temperature=0.4
             )
             recommendation = response.choices[0].text.strip()
 
             # Add recommendation to incident information
             incident["INCIDENT RECOMMENDATIONS: "] = recommendation
             
-            print("Recommendation: " + recommendation)
+            print("Incident Recommendations: " + recommendation)
 
             return incident
         else:
@@ -150,64 +146,35 @@ def search_service_now(service_now_uri, username, password, description):
             for item in data["result"]:
                 # print(f"ID: {item['sys_id']}")
                 # print(f"Description: {item['description']}")
-                # print(f"Work Notes: {item['work_notes']}")
-                # print(f"Comments: {item['comments']}")
-                # print(f"Resolution Notes: {item['close_notes']}")
+                #print(f"Work Notes: {item['work_notes']}")
+                print(f"Comments: {item['comments']}")
+                print(f"Resolution Notes: {item['close_notes']}")
                 # print(f"Resolved By: {item['resolved_by']}")
                 # Add the relevant info to the list
                 #relevantinfo.append(item['sys_id'])
+                
                 relevantinfo.append(item['description'])
+                #relevantinfo.append(item['resolution_notes'])
                 relevantinfo.append(item['work_notes'])
                 relevantinfo.append(item['comments'])
                 relevantinfo.append(item['close_notes'])
                 relevantinfo.append(item['resolved_by'])
+                relevantinfo.append(item['assigned_to'])
                 
         else:
             print("No results found")
             # Add the relevant info to the list as empty
             #relevantinfo.append("There are no current recommendations for this incident as there are no similar incidents in the database.")
             return []
+    print(relevantinfo)
     return relevantinfo
 
 
-@app.route('/get-incident', methods=['POST'])
-def get_incident():
-    data = request.get_json()
-    service_now_uri = data.get('service_now_uri')
-    username = "AppDynamicAlert"
-    password = "appdynamics01"
-    incident_number = data.get('incident_number')
+service_now_uri = "https://rydersystemsdev.service-now.com"
+username = "AppDynamicAlert"
+password = "appdynamics01"
+print("Welcome to the Incident Recommender!")
+print("Please enter the incident number to get started.")
+incident_number = input("Enter incident number: ")
 
-    try:
-        incident_info = get_incident_info(service_now_uri, username, password, incident_number)
-        return jsonify(incident_info)
-    except Exception as e:
-        return jsonify({"error": str(e)}), 400
-
-
-@app.route("/logo.png")
-def plugin_logo():
-    return send_from_directory('.', 'logo.png')
-
-
-@app.route('/.well-known/ai-plugin.json')
-def serve_manifest():
-    return send_from_directory('.', 'ai-plugin.json')
-
-
-@app.route('/openapi.yaml')
-def serve_openapi_yaml():
-    with open('openapi.yaml', 'r') as f:
-        yaml_data = f.read()
-    return Response(yaml_data, mimetype='text/yaml')
-
-
-@app.route('/ai-plugin.json')
-def serve_openapi_json():
-    with open('ai-plugin.json', 'r') as f:
-        json_data = json.load(f)
-    return jsonify(json_data)
-
-
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5003)
+incident_info = get_incident_info(service_now_uri, username, password, incident_number)
