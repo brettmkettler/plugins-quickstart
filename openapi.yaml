@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: ServiceNow Incident Plugin
-  description: A plugin that retrieves incident information and can create incidents ServiceNow.
+  description: A plugin that retrieves incident information and can create incidents in ServiceNow.
   version: 1.0.0
 servers:
   - url: http://localhost:5003
@@ -71,6 +71,14 @@ components:
           items:
             type: string
           description: The comments related to the incident, provide a detailed summary.
+        Pinecone Recommendations:
+          type: array
+          items:
+            type: string
+          description: The recommendations for the incident from Pinecone.
+        AI Recommendations:
+          type: string
+          description: The AI's recommended solution for the incident.
     Error:
       type: object
       properties:
