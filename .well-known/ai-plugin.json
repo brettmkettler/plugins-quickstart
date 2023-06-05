@@ -2,8 +2,8 @@
   "schema_version": "v1",
   "name_for_human": "ServiceNow Incident Plugin",
   "name_for_model": "servicenow_incident",
-  "description_for_human": "Plugin for retrieving ServiceNow incident details",
-  "description_for_model": "Plugin for retrieving ServiceNow incident details",
+  "description_for_human": "Plugin for retrieving ServiceNow incident details and providing recommendations for resolution",
+  "description_for_model": "Plugin for retrieving ServiceNow incident details and providing recommendations for resolution",
   "auth": {
     "type": "none"
   },

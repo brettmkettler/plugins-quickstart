@@ -4,7 +4,7 @@ import spacy
 import openai
 import os
 
-openai.api_key = "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"
+openai.api_key = "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"
 
 # ServiceNow API credentials
 instance = "rydersystemsdev"

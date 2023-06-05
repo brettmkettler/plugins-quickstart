@@ -29,23 +29,127 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+  /get_assigned_to_user:
+    post:
+      operationId: getIncidentsByUser
+      summary: Retrieve incidents assigned to a particular user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GetIncidentsByUserRequest'
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IncidentsByUserResponse'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /generate-recommendation:
+    post:
+      operationId: generateRecommendation
+      summary: Generate a recommendation for an incident
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GenerateRecommendationRequest'
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenerateRecommendationResponse'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /get-sla-time:
+    post:
+      operationId: getSLATime
+      summary: Get SLA time for an incident
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GetSLATimeRequest'
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetSLATimeResponse'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+/check-licensing-consumption:
+    get:
+      operationId: checkLicensingConsumption
+      summary: Check licensing consumption
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LicensingConsumptionResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
 components:
   schemas:
     GetIncidentRequest:
       type: object
       properties:
-        service_now_uri:
-          type: string
-          description: The ServiceNow URI, it should be in this format https://rydersystemsdev.service-now.com
-        username:
-          type: string
-          description: The API username for authentication.
-        password:
-          type: string
-          description: The API password for authentication.
         incident_number:
           type: string
           description: The number of the incident to retrieve.
+    GetIncidentsByUserRequest:
+      type: object
+      properties:
+        assigned_to:
+          type: string
+          description: The user to retrieve incidents for the user.
+    GenerateRecommendationRequest:
+      type: object
+      properties:
+        description:
+          type: string
+          description: The description of the incident.
+        work_notes:
+          type: array
+          items:
+            type: string
+          description: The work notes related to the incident.
+        comments:
+          type: array
+          items:
+            type: string
+          description: The comments related to the incident.
+        relevantinfo:
+          type: array
+          items:
+            type: string
+          description: The relevant incident details.
     IncidentResponse:
       type: object
       properties:
@@ -71,6 +175,57 @@ components:
           items:
             type: string
           description: The comments related to the incident, provide a detailed summary.
+    IncidentsByUserResponse:
+      type: object
+      properties:
+        incident_count:
+          type: integer
+          description: The count of incidents assigned to the user.
+        incidents:
+          type: array
+          items:
+            $ref: '#/components/schemas/IncidentResponse'
+    GenerateRecommendationResponse:
+      type: object
+      properties:
+        recommendation:
+          type: string
+          description: The generated recommendation.
+    GetSLATimeRequest:
+      type: object
+      properties:
+        service_now_uri:
+          type: string
+          description: The ServiceNow URI.
+        username:
+          type: string
+          description: The username for authentication.
+        password:
+          type: string
+          description: The password for authentication.
+        incident_number:
+          type: string
+          description: The number of the incident to retrieve the SLA time for.
+    GetSLATimeResponse:
+      type: object
+      properties:
+        sla_time:
+          type: string
+          description: The SLA time for the incident.
+    LicensingConsumptionResponse:
+      type: array
+      items:
+        type: object
+        properties:
+          application_name:
+            type: string
+            description: The name of the application.
+          total_license_units:
+            type: integer
+            description: The total license units.
+          used_license_units:
+            type: integer
+            description: The used license units.
     Error:
       type: object
       properties:
