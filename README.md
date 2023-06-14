@@ -10,6 +10,12 @@ To install the required packages for this plugin, run the following command:
 pip install -r requirements.txt
 ```
 
+Create a keys.py file and put the below code with your OpenAI key inside:
+
+```
+openai_key = "sk-************"
+```
+
 To run the plugin, enter the following command:
 
 ```bash
