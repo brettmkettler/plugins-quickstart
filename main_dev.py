@@ -1,8 +1,11 @@
 import os
+from re import A
+from cv2 import add
 from flask import Flask, Response, request, jsonify, send_from_directory
 from flask_cors import CORS
 from sentence_transformers import SentenceTransformer, util
 import requests
+from sqlalchemy import desc
 import yaml
 import json
 import openai
@@ -12,14 +15,27 @@ import keys
 
 openai.api_key = keys.openai_key
 
+
+
+# Simlar: ['INC2059792', 'INC2054440', 'INC2054435', 'INC2054429'
+
+
 ################
 # VARIABLES
 ################
 
-# TODO: Update in lower app routes
-service_now_uri = "https://rydersystemsdev.service-now.com"
-username = "AppDynamicAlert"
-password = "appdynamics01"
+#service_now_uri_main = "https://dev59033.service-now.com"
+#service_now_username = "admin_api"
+#service_now_password = "(Bf?6H{B<{ED.^[Ht%CSz#WxPm4Wxvp?hl!fuHl.yJJds3dq(l0p^WTB_v9C(-Fo%nHP03K))SHW6R>HDJ}@<E=GV){Y5}9Rl.s?"
+
+service_now_uri_main = "https://sncapappsonedev.service-now.com"
+service_now_username = "gemi_ai"
+service_now_password = "Gemi_AI23!!!!"
+
+#service_now_uri = "https://rydersystemsdev.service-now.com"
+#service_now_username = "AppDynamicAlert"
+#service_now_password = "appdynamics01"
+
 
 app = Flask(__name__)
 CORS(app)
@@ -100,27 +116,33 @@ CORS(app)
 
     
 #########################################################
-######### FUNCTIONS ###########
+######### FUNCTIONS         =^o.o^=           ###########
 #########################################################
 def check_current_ticket_resolution(incident):
     # Get the current incident resolution
     print("Checking current incident resolution...\n\n")
     
 
-def summarize_incident_comments(comments, work_notes, comments_and_work_notes, close_notes):
+
+def summarize_incident_comments(comments, work_notes, comments_and_work_notes, close_notes, incident_resolvedby, incident_priority):
     print("Summarizing comments to a resolution...\n\n")
-    
+    username = service_now_username
+    password = service_now_password
+    service_now_uri = service_now_uri_main
     # Get only most recent work notes, comments, and close notes
     comments = comments[-4:]
     work_notes = work_notes[-4:]
-    comments_and_work_notes = comments_and_work_notes[-4:]
+    comments_and_work_notes = comments_and_work_notes[-4:]    
     
+    print(f'Resolved by: {incident_resolvedby}')
+    print(f'Priority: {incident_priority}')
+
     incident_prompt = (
-        "You are a helpful AI Assistant named Gemi. How would you summarize the work notes and comments please provide a very detailed 2 paragraph recommending a solution to this incident based on the comments given below: "
+        "How would you summarize the work notes and comments please provide a very detailed 2 paragraph solution with steps on how to fix the issue. You will answer the question each time like the issue is not already resolved and put the name of the person who resolved the issue at the end. Finally, put the priority of the incident at the end of the paragraph. \n"
         + "\n"
-        #+ "Comments: "
-        #+ comments
-        #+ "\n"
+        + "Similar Incidents Resolved By: "
+        + str(incident_resolvedby)
+        + "\n"
         + "Work Notes: "
         + work_notes
         + "\n"
@@ -128,6 +150,11 @@ def summarize_incident_comments(comments, work_notes, comments_and_work_notes, c
         + comments_and_work_notes
         + "Close Notes: "
         + close_notes
+        + "\n"
+        + "Priority: "
+        + incident_priority
+        + "\n"
+        + "Recommendation: "
         )
 
     #print("Incident Prompt: " + incident_prompt)
@@ -147,6 +174,7 @@ def summarize_incident_comments(comments, work_notes, comments_and_work_notes, c
     return summarize
     
     
+    
 
 # ANALYZE & GET ONLY SIMILAR INCIDENTS
 # Step 
@@ -161,17 +189,22 @@ def analyze_incidents(description, incidents):
     
     relevantinfo = []
     relevantincidents = []
+    incident_priorities = []
     
-    similarity_threshold = 0.8  # Adjust the threshold based on your requirements
+    similarity_threshold = 0.68  # Adjust the threshold based on your requirements
 
     for incident in incidents:
         incident_description = incident.get('short_description', '')
         incident_number = incident.get('number', '')
         incident_desc = incident.get('description', '')
         incident_closenotes = incident.get('close_notes', '')
+        incident_resolvedby = incident.get('assigned_to', '')
         incident_worknotes = incident.get('work_notes', '')
         incident_comments = incident.get('comments', '')
+        incident_closed_by = incident.get('closed_by', '')
         incident_comments_and_worknotes = incident.get('comments_and_work_notes', '')
+        incident_priority = incident.get('priority', '')
+        
         
         print("Analyzing Incident Number: ", incident_number)
         
@@ -190,7 +223,7 @@ def analyze_incidents(description, incidents):
             #incident_comments = get_incident_comments(incident_number)
             
             # Summarize the comments
-            summarize = summarize_incident_comments(incident_comments, incident_worknotes, incident_comments_and_worknotes, incident_closenotes)
+            summarize = summarize_incident_comments(incident_comments, incident_worknotes, incident_comments_and_worknotes, incident_closenotes, incident_resolvedby, incident_priority)
         
             # If similarity score is above the threshold, consider them similar issues
             print(f"Similar issue found between current incident and previous issue: {incident_description}")
@@ -209,24 +242,34 @@ def analyze_incidents(description, incidents):
             
             relevantinfo.append(summarize)
             relevantincidents.append(incident_number)
+            incident_priorities.append(incident_priority)
         
         # Add the current incident's description to the list of common issues
         #common_issues.append(incident_description)
     
-    # combine relevantinfo and relevantincidents into a dictionary
+    # combine relevantinfo, relevantincidents, incident_priorities into a dictionary
     relevantinfo = dict(zip(relevantincidents, relevantinfo))
+    
     print("Relevant Info: ", relevantinfo)
+    print("Relevant Incidents: ", relevantincidents)
+    print("Incident Priorities: ", incident_priorities)
         
-    return relevantinfo, relevantincidents
+    return relevantinfo, relevantincidents, incident_priorities
 
 
 
 
-def create_service_request(service_now_uri, username, password, short_description, description):
+def create_service_request(service_now_uri, username, password, short_description, description, caller_id, assignment_group):
     # Developer instance URL
-    url = f"https://dev59033.service-now.com/api/now/table/sc_request"
-    username = "admin_api"
-    password = "(Bf?6H{B<{ED.^[Ht%CSz#WxPm4Wxvp?hl!fuHl.yJJds3dq(l0p^WTB_v9C(-Fo%nHP03K))SHW6R>HDJ}@<E=GV){Y5}9Rl.s?"
+    service_now_uri = service_now_uri_main
+    #url = f"{service_now_uri}/api/now/table/sc_request"
+    url = f"{service_now_uri}/api/now/table/incident"
+    username = service_now_username
+    password = service_now_password
+    #url = f"{service_now_uri}/api/now/table/sc_request"
+    #username = service_now_username
+    #password = service_now_password
+    print("Caller ID: ", caller_id)
     headers = {
         "Content-Type": "application/json",
         "Accept": "application/json"
@@ -235,7 +278,12 @@ def create_service_request(service_now_uri, username, password, short_descriptio
     payload = {
         "short_description": short_description,
         "description": description,
-        "opened_by": "Gemi_AI"
+        "opened_by": "gemi Ai",
+        "u_type": "Service Request",
+        "caller_id": caller_id,
+        "assignment_group": assignment_group,
+        "contact_type": "Virtual Agent",
+        "cmdb_ci": "AMO"
     }
 
     response = requests.post(url, headers=headers, auth=auth, json=payload)
@@ -273,10 +321,43 @@ def create_service_request(service_now_uri, username, password, short_descriptio
 #             raise Exception("SLA not found or API response empty")
 #     else:
 #         raise Exception(f"Error: {response.status_code}, {response.text}")
+def get_assignmentgroup(service_now_uri, username, password, plain_text_name):
+    service_now_uri = service_now_uri_main
+    url = f"{service_now_uri}/api/now/table/sys_user_group"
+    headers = {
+        "Content-Type": "application/json",
+        "Accept": "application/json"
+    }
+    auth = (username, password)
+    params = {
+        "sysparm_query": f"name={plain_text_name}",
+        "sysparm_fields": "name"
+    }
 
+    response = requests.get(url, headers=headers, auth=auth, params=params)
+
+    if response.status_code == 200:
+        result = response.json()
+
+        if "result" in result and len(result["result"]) > 0:
+            group = result["result"][0]
+            group_name = group.get("name")
+            print(f"Assignment group name: {group_name}")
+            return group_name
+        elif "result" in result and len(result["result"]) == 0:
+            print("Trying again with reversed first and last name...")
+            split_name = plain_text_name.split(" ")
+            reversed_name = split_name[1] + " " + split_name[0]
+            print("Reversed name: ", reversed_name)
+            return reversed_name
+        else:
+            raise Exception("Please make sure you enter the correct name of the assignment group and try again.")
+    else:
+        raise Exception(f"Error: {response.status_code}, {response.text}")
 
 def get_user_name(service_now_uri, username, password, plain_text_name):
-    url = f"https://rydersystemsdev.service-now.com/api/now/table/sys_user"
+    service_now_uri = service_now_uri_main
+    url = f"{service_now_uri}/api/now/table/sys_user"
     headers = {
         "Content-Type": "application/json",
         "Accept": "application/json"
@@ -291,23 +372,66 @@ def get_user_name(service_now_uri, username, password, plain_text_name):
 
     if response.status_code == 200:
         result = response.json()
+        # write result to console
+        #print("Result: ", result)
 
         if "result" in result and len(result["result"]) > 0:
             user = result["result"][0]
             user_name = user.get("user_name")
             print(f"User name: {user_name}")
             return user_name
+        elif "result" in result and len(result["result"]) == 0:
+            
+            print("Trying again with reversed first and last name...")
+            # reverse the first and last name in plain_text_name and try again
+            split_name = plain_text_name.split(" ")
+            reversed_name = split_name[1] + " " + split_name[0]
+            print("Reversed name: ", reversed_name)
+            return reversed_name
         else:
-            raise Exception("User not found or API response empty")
+            raise Exception("Please make sure you enter the first and last name of the user, and try again.")
     else:
         raise Exception(f"Error: {response.status_code}, {response.text}")
 
 
+def get_user_name_from_sys_id(service_now_uri, username, password, sys_id):
+    username = service_now_username
+    password = service_now_password
+    service_now_uri = service_now_uri_main
+    url = f"{service_now_uri}/api/now/table/sys_user/{sys_id}"
+    headers = {
+        "Content-Type": "application/json",
+        "Accept": "application/json"
+    }
+    auth = (username, password)
+    params = {
+        "sysparm_fields": "name"
+    }
+
+    response = requests.get(url, headers=headers, auth=auth, params=params)
+
+    if response.status_code == 200:
+        result = response.json()
+
+        if "result" in result:
+            user = result["result"]
+            user_name = user.get("name")
+            print(f"Name: {user_name}")
+            return user_name
+        else:
+            raise Exception("User not found.")
+    else:
+        raise Exception(f"Error: {response.status_code}, {response.text}")
+
+
+
 def get_incidents_by_user(service_now_uri, username, password, assigned_to):
+    
+    service_now_uri = service_now_uri_main
     
     user_name = get_user_name(service_now_uri, username, password, assigned_to)
     
-    url = f"https://rydersystemsdev.service-now.com/api/now/table/incident"
+    url = f"{service_now_uri}/api/now/table/incident"
     headers = {
         "Content-Type": "application/json",
         "Accept": "application/json"
@@ -335,9 +459,10 @@ def get_incidents_by_user(service_now_uri, username, password, assigned_to):
 
 
 def get_cmdb_item_from_incident(incident_number):
-    username = "AppDynamicAlert"
-    password = "appdynamics01"
-    api_url = 'https://rydersystemsdev.service-now.com/api/now/table/incident'
+    username = service_now_username
+    password = service_now_password
+    service_now_uri = service_now_uri_main
+    api_url = f'{service_now_uri}/api/now/table/incident'
     headers = {
         'Accept': 'application/json',
         'Content-Type': 'application/json'
@@ -346,6 +471,7 @@ def get_cmdb_item_from_incident(incident_number):
         'sysparm_query': f'number={incident_number}',
         'sysparm_limit': 1
     }
+    print(f'Getting CMDB item for incident {incident_number}...')
     response = requests.get(api_url, headers=headers, auth=(username, password), params=params)
     print(response)
     if response.status_code == 200:
@@ -354,19 +480,20 @@ def get_cmdb_item_from_incident(incident_number):
             result = data.get('result')
             print (result)
             if result:
-                #
-                # if cmdb is null, return None
-                if result[0].get('cmdb_ci') is None:
+                cmdb_item = result[0].get('cmdb_ci')  # Corrected from data[0].get('cmdb_ci')
+                if cmdb_item is None:
                     print('No CMDB item found for the given incident.')
                     return None
                 else:
-                    cmdb_item = result[0].get('cmdb_ci')
                     print(f'CMDB item: {cmdb_item}')
-
-                    cmdb_item_value = cmdb_item.get('value')  # Use .get() to access the value
-                    print(f'CMDB item value: {cmdb_item_value}')
-
-                    return cmdb_item_value
+                    cmdb_item_value = cmdb_item.get('value')  # You can directly access the value
+                    if cmdb_item_value is None:
+                        print('No CMDB item found for the given incident.')
+                        return None
+                    else:
+                        print(f'CMDB item value: {cmdb_item_value}')
+                        return cmdb_item_value
+                    
             else:
                 print('No incident found with the given number.')
                 return None
@@ -379,10 +506,51 @@ def get_cmdb_item_from_incident(incident_number):
 
 
 
+def get_incident_info(service_now_uri, username, password, incident_number):
+    service_now_uri = service_now_uri_main
+    url = f"{service_now_uri}/api/now/table/incident"
+    headers = {
+        "Content-Type": "application/json",
+        "Accept": "application/json"
+    }
+    auth = (username, password)
+    params = {
+        "sysparm_query": f"number={incident_number}",  # Only retrieve incidents with state 6 (Resolved) or 7 (Closed)
+        'sysparm_limit': 100,  # Adjust the limit based on your requirements
+        'sysparm_sort': 'sys_updated_on:desc',  # Sort incidents by the latest updated date in descending order
+        'sysparm_display_value': 'true'  # Display display values instead of sys_ids
+    }
+
+    response = requests.get(url, headers=headers, auth=auth, params=params)
+
+    if response.status_code == 200:
+        result = response.json()
+
+        if "result" in result and len(result["result"]) > 0:
+            incident = result["result"][0]  # Assuming only one incident is returned
+
+            # Extract work notes and comments
+            description = incident.get("description", "")
+            work_notes = incident.get("work_notes", "")
+            comments = incident.get("comments", "")
+            number = incident.get("number", "")
+            comments_and_work_notes = ("comments_and_work_notes", "")
+            
+            # Only get 3 most recent work notes and comments
+            comments_and_work_notes = comments_and_work_notes[-4:]
+
+
+            return incident
+        else:
+            raise Exception("Incident not found or API response empty")
+    else:
+        raise Exception(f"Error: {response.status_code}, {response.text}")
+
 
 # Needs to be renamed
-def get_incident_info(service_now_uri, username, password, incident_number):
-    url = f"https://rydersystemsdev.service-now.com/api/now/table/incident"
+def get_incident_info_with_recommendation(service_now_uri, username, password, incident_number):
+    service_now_uri = service_now_uri_main
+    url = f"{service_now_uri}/api/now/table/incident"
     headers = {
         "Content-Type": "application/json",
         "Accept": "application/json"
@@ -431,9 +599,10 @@ def get_incident_info(service_now_uri, username, password, incident_number):
             relatedinfo = "Provide a general recommendation for this incident."
             
             print("Common Issues Resolution notes: " + str(relatedinfo))
-            
+            # 
+            # Check the work notes to see if the someone has already fixed the item.
             incident_prompt = (
-                "You are a helpful AI Assistant named Gemi. How would you help resolve this incident given the incident description, work notes, comments, and relevant incident details. Check the work notes to see if the someone has already fixed the item. Please provide a very detailed 2 paragraph recommending a solution to this incident based on the information given below. Note that this recommendation is only based on the ticket details and recommend to the user that they can ask for a more detailed recommendation if needed: "
+                "You are a helpful AI Assistant named Gemi. How would you help resolve this incident given the incident description, work notes, comments, and relevant incident details.  Please provide a very detailed 2 paragraph recommending a solution to this incident based on the information given below. Note that the ticket is not resolved and you must come up with a recommendation on how to solve the incident. Note that this recommendation is only based on the ticket details and recommend to the user that they can ask for a more detailed recommendation if needed: "
                 + "\n"
                 + "Incident Description: "
                 + description
@@ -529,11 +698,12 @@ def get_incident_info(service_now_uri, username, password, incident_number):
 #     return relevantinfo
 
 
-def fetch_related_incidents(cmdb_item_identifier):
+def fetch_related_incidents_by_cmdb(cmdb_item_identifier):
+    service_now_uri = service_now_uri_main
     print(f"Fetching related incidents for CMDB item: {cmdb_item_identifier}")
-    username = "AppDynamicAlert"
-    password = "appdynamics01"
-    api_url = 'https://rydersystemsdev.service-now.com/api/now/table/incident'
+    username = service_now_username
+    password = service_now_password
+    api_url = f'{service_now_uri}/api/now/table/incident'
     headers = {
         'Accept': 'application/json',
         'Content-Type': 'application/json'
@@ -545,6 +715,7 @@ def fetch_related_incidents(cmdb_item_identifier):
         'sysparm_display_value': 'true'  # Display display values instead of sys_ids
     }
     response = requests.get(api_url, headers=headers, auth=(username, password), params=params)
+    
     if response.status_code == 200:
         print(response.json().get('result'))
         return response.json().get('result')
@@ -554,15 +725,46 @@ def fetch_related_incidents(cmdb_item_identifier):
     
     
 def get_entity_incidents(username, password, description):
-    url = f"https://rydersystemsdev.service-now.com/api/now/table/incident"
+    service_now_uri = service_now_uri_main
+    url = f"{service_now_uri}/api/now/table/incident"
+    
+    ################################
+    keyword_prompt = (
+        "Extract relevant keywords from this Incident Description: "
+        + "\n"
+        + "Incident Description: "
+        + description
+        + "\n"
+        + "Keywords:"
+    )
+    
+    # Generate recommendation using OpenAI
+    response = openai.Completion.create(
+        engine="text-davinci-003",
+        prompt=keyword_prompt,
+        max_tokens=1000,
+        n=1,
+        stop=None,
+        temperature=0.1
+    )
+    keywords = response
+    
+    print(f"keywords: {keywords}")
+    ################################
 
-    # Extracting key terms from description of the incident
-    nlp = spacy.load("en_core_web_md")
-    doc = nlp(description)
-    entities = [ent.text for ent in doc.ents]
+    # grab keywords from the response
+    entities = keywords.choices[0].text.strip()
+    
+    print(f"Entities: {entities}")
+    
+    # return a max of 4 entities
+    entities = entities.split()
+    entities = entities[-7:]
+    
     if not entities:
         print("No entities found.")
-        exit()
+    else:
+        print("Entities found: ", entities)
 
     # Searching for incidents with the same key terms
     headers = {
@@ -593,25 +795,68 @@ def get_entity_incidents(username, password, description):
     
     return incidents_raw
 
+import openai
 
-def generate_recommendation(username, password, description, work_notes, comments, relevantinfo, incident_number):
+def get_suggestedpriority(incidents_raw):
+    print(f"Incidents raw: {incidents_raw}")
+    incidents_raw = str(incidents_raw)
+    
+    print("Checking the priority of the incidents...")
+    
+    keyword_prompt = (
+        "Analyze the list of priorities and find the most common out of all the priorities:  "
+        + "\n"
+        + "Relevant Incidents Priorities: "
+        + incidents_raw
+        + "\n"
+        + "Suggested Priority:"
+    )
+    
+    # Generate recommendation using OpenAI
+    response = openai.Completion.create(
+        engine="text-davinci-003",
+        prompt=keyword_prompt,
+        max_tokens=1000,
+        n=1,
+        stop=None,
+        temperature=0.1
+    )
+    suggested_priority = response.choices[0].text.strip()
+    
+    print(f"Suggested Priority: {suggested_priority}")
+    return suggested_priority
+
+
+def generate_recommendation(username, password, description, work_notes, comments, relevantinfo, incident_number, priority):
     
     print("Generating recommendation...")
 
     cmdb_item = get_cmdb_item_from_incident(incident_number)
     
-    # if cmdb_item is empty, then cmdb_item = "No CMDB Item found"
-    if not cmdb_item:
-        print("No CMDB Item found")
-        cmdb_item = "No CMDB Item found"
-    
-    
     print(f"CMDB Item: {cmdb_item}")
     
-    incidents_raw = fetch_related_incidents(cmdb_item)
+    # fetch related incidents via cmdb_item
+    incidents_raw = fetch_related_incidents_by_cmdb(cmdb_item)
+    
+    # get incidents via description with entities
+    #incidents_raw = get_entity_incidents(username, password, description)
     
     #analyze incidents        
-    relevantinfodata = analyze_incidents(description, incidents_raw)
+    relevantinfodata = analyze_incidents(description, incidents_raw) #relinfo, reltickets
+    
+    #get the 3rd return from relevantinfodata and save as suggested_priority_list
+    suggested_priority_list = relevantinfodata[2]
+    
+    suggested_priority = get_suggestedpriority(suggested_priority_list)    
+    
+    if priority == suggested_priority:
+        suggested_response = f"Priority is correct. Continuing with recommendation as the ticket is already at the correct priority of {priority}."
+        print(f"Priority is correct. Continuing with recommendation as the ticket is already at the correct priority of {priority}.")
+        
+    else:
+        suggested_response = f"Priority is seems to be incorrect. After analysis of past similar tickets, The ticket is currently at {priority} and I am Recommending a priority change to {suggested_priority}. Please confirm this and raise a request to change this tickets priority to avoid SLA issues."
+        print(f"Priority is incorrect. Recommending a priority change to {suggested_priority}. The ticket is currently at {priority}.")
+        
     
     # if relevantinfodata is empty, then relevantinfodata = "No relevant information found"
     if not relevantinfodata:
@@ -619,7 +864,13 @@ def generate_recommendation(username, password, description, work_notes, comment
 
     # Create incident prompt
     incident_prompt = (
-        "You are a helpful AI Assistant named Gemi. How would you help resolve this incident given the incident description, work notes, comments, and relevant incident details. Check the work notes to see if the someone has already fixed the item. Please provide a very detailed 2 paragraph recommending a solution to this incident based on the information given below. Note that this recommendation is only based on the ticket details and recommend to the user that they can ask for a more detailed recommendation if needed: "
+        "You are a helpful AI Assistant named Gemi. Your job is to help resolve this incident given the incident description, work notes, comments, and relevant incident details. Please provide a very detailed 2 paragraph recommending a step by step solution to this incident based on the information given below. If the priority change is needed, then mention this at the end as well. In addition, provide the names of each person that has resolved similar incidents in the past, and the count of the number of incidents that each person has resolved. Also, recommend to the user that they can ask for a more detailed recommendation if needed: "
+        + "\n"
+        + "Suggested Priority: "
+        + str(suggested_response)
+        + "\n"
+        + "Relevant Incident details: "
+        + str(relevantinfodata)
         + "\n"
         + "Incident Description: "
         + description
@@ -630,10 +881,7 @@ def generate_recommendation(username, password, description, work_notes, comment
         + "Comments: "
         + str(comments)
         + "\n"
-        + "Relevant Incident details: "
-        + str(relevantinfodata)
-        + "\n"
-        + "\nRecommendation:"
+        + "Recommendation:"
     )
 
     print("Incident Prompt: " + incident_prompt)
@@ -645,18 +893,24 @@ def generate_recommendation(username, password, description, work_notes, comment
         max_tokens=1000,
         n=1,
         stop=None,
-        temperature=0.3
+        temperature=0.1
     )
     recommendation = response.choices[0].text.strip()
-
-    print("Recommendation: " + recommendation)
-
-    return recommendation
+    
+    relevant_tickets = relevantinfodata[1]
+    
+    print("Recommendation: " + recommendation + "\n" + "Relevant Tickets: " + str(relevant_tickets))
+    
+    return {
+    'recommendation': recommendation,
+    'relevant_tickets': relevant_tickets
+    }
 
 
 # get sys_id of incident
 def get_incident_sys_id(service_now_uri, username, password, incident_number):
-    url = f"https://rydersystemsdev.service-now.com/api/now/table/incident"
+    service_now_uri = service_now_uri_main
+    url = f"{service_now_uri}/api/now/table/incident"
     headers = {
         "Content-Type": "application/json",
         "Accept": "application/json"
@@ -682,6 +936,63 @@ def get_incident_sys_id(service_now_uri, username, password, incident_number):
     else:
         raise Exception(f"Error: {response.status_code}, {response.text}")
 
+### ================= UPDATE INCIDENT INFO ================= ###
+
+def update_incident_info_assigned_to(service_now_uri, username, password, incident_number, assigned_to):
+    service_now_uri = service_now_uri_main
+    
+    original_incident = incident_number
+    incident_number = get_incident_sys_id(service_now_uri, username, password, incident_number)
+    
+    url = f"{service_now_uri}/api/now/table/incident/{incident_number}"
+    headers = {
+        "Content-Type": "application/json",
+        "Accept": "application/json"
+    }
+    auth = (username, password)
+    data = {
+        "assigned_to": assigned_to
+    }
+    
+    #incident_info = get_incident_info(service_now_uri, username, password, incident_number)
+
+    print(f"Updating incident {original_incident} with the following data: {data}")
+
+    response = requests.patch(url, headers=headers, auth=auth, json=data)
+
+    if response.status_code == 200:
+        return {"message": f"Incident {original_incident} has been updated."}
+    else:
+        raise Exception(f"Error: {response.status_code}, {response.text}")
+    
+    
+
+def update_incident_info_assignment_group(service_now_uri, username, password, incident_number, assignment_group):
+    service_now_uri = service_now_uri_main
+    
+    original_incident = incident_number
+    incident_number = get_incident_sys_id(service_now_uri, username, password, incident_number)
+    
+    url = f"{service_now_uri}/api/now/table/incident/{incident_number}"
+    headers = {
+        "Content-Type": "application/json",
+        "Accept": "application/json"
+    }
+    auth = (username, password)
+    data = {
+        "assignment_group": assignment_group
+    }
+    
+    #incident_info = get_incident_info(service_now_uri, username, password, incident_number)
+
+    print(f"Updating incident {original_incident} with the following data: {data}")
+
+    response = requests.patch(url, headers=headers, auth=auth, json=data)
+
+    if response.status_code == 200:
+        return {"message": f"Incident {original_incident} has been updated."}
+    else:
+        raise Exception(f"Error: {response.status_code}, {response.text}")
 
 ##########################################################################
 ######################### APP ROUTES #####################################
@@ -691,14 +1002,22 @@ def get_incident_sys_id(service_now_uri, username, password, incident_number):
 def create_service_request_route():
     data = request.get_json()
     service_now_uri = data.get('service_now_uri')
-    username = "AppDynamicAlert"
-    password = "appdynamics01"
+    username = service_now_username
+    password = service_now_password
     short_description = data.get('short_description')
     description = data.get('description')
+    caller_id = data.get('requested_for')
+    assignment_group = data.get('assignment_group')
+    
+    print(f"Requested For: {caller_id}")
+    
+    #assignment_group_name = get_assignmentgroup(service_now_uri, username, password, plain_text_name)
+    
+    print(f"Assignment Group: {assignment_group}")
     
 
     try:
-        service_request = create_service_request(service_now_uri, username, password, short_description, description)
+        service_request = create_service_request(service_now_uri, username, password, short_description, description, caller_id, assignment_group)
         return jsonify(service_request)
     except Exception as e:
         return jsonify({"error": str(e)}), 400
@@ -741,26 +1060,43 @@ def create_service_request_route():
 #         return jsonify({'sla_time': sla_time})
 #     except Exception as e:
 #         return jsonify({"error": str(e)}), 400
-    
+
 
 @app.route('/generate-recommendation', methods=['POST'])
 def generate_recommendation_route():
     data = request.get_json()
+    
+    incident_number = data.get('incident_number')
     service_now_uri = data.get('service_now_uri')
-    username = "AppDynamicAlert"
-    password = "appdynamics01"
-    description = data.get('description')
+    username = service_now_username
+    password = service_now_password
+    
+    rel_data = get_incident_info(service_now_uri, username, password, incident_number)
+    
+    description = rel_data.get('description')
     work_notes = data.get('work_notes', [])
     #comments = data.get('comments', [])
     comments = data.get("comments_and_work_notes", "")
+    priority = rel_data.get('priority', '')
     relevantinfo = data.get('relevantinfo', [])
-    incident_number = data.get('incident_number')
+    
+    
     #comments_and_work_notes = data.get("comments_and_work_notes", "")
     print(f"Incident Number: {incident_number}")
+    print(f"Current Incident Priority: {priority}")
 
     try:
-        recommendation = generate_recommendation(username, password, description, work_notes, comments, relevantinfo, incident_number)
-        return jsonify({'recommendation': recommendation})
+        # recommendation = generate_recommendation(username, password, description, work_notes, comments, relevantinfo, incident_number)
+        # print(f"Recommendation: {recommendation}")
+        # print(f"Recommendation: {recommendation.get('recommendation')}")
+        # print(f"Relevant Tickets: {recommendation.get('relevant_tickets')}")
+        # return jsonify({'recommendation': recommendation.get('recommendation')}, {'relevant_tickets': recommendation.get('relevant_tickets')})
+        results = generate_recommendation(username, password, description, work_notes, comments, relevantinfo, incident_number, priority)
+        
+        return jsonify({
+            'recommendation': results.get('recommendation'),
+            'relevant_tickets': results.get('relevant_tickets')
+        })
     except Exception as e:
         return jsonify({"error": str(e)}), 400
 
@@ -769,13 +1105,55 @@ def generate_recommendation_route():
 def get_incident():
     data = request.get_json()
     service_now_uri = data.get('service_now_uri')
-    username = "AppDynamicAlert"
-    password = "appdynamics01"
+    username = service_now_username
+    password = service_now_password
     incident_number = data.get('incident_number')
 
     try:
-        incident_info = get_incident_info(service_now_uri, username, password, incident_number)
+        incident_info = get_incident_info_with_recommendation(service_now_uri, username, password, incident_number)
         return jsonify(incident_info)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
+
+
+@app.route('/update-incident-assigned_to', methods=['POST'])
+def update_incident_assigned_to():
+    data = request.get_json()
+    service_now_uri = data.get('service_now_uri')
+    username = service_now_username
+    password = service_now_password
+    incident_number = data.get('incident_number')
+    
+    #Get relevant info from the incident
+    rel_data = get_incident_info(service_now_uri, username, password, incident_number)
+    
+    assigned_to = data.get('assigned_to')
+    #state = data.get('state')
+    
+    try:
+        updated_incident = update_incident_info_assigned_to(service_now_uri, username, password, incident_number, assigned_to)
+        return jsonify(updated_incident)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
+
+
+@app.route('/update_incident_assignment_group', methods=['POST'])
+def update_incident_assignment_group():
+    data = request.get_json()
+    service_now_uri = data.get('service_now_uri')
+    username = service_now_username
+    password = service_now_password
+    incident_number = data.get('incident_number')
+    
+    #Get relevant info from the incident
+    rel_data = get_incident_info(service_now_uri, username, password, incident_number)
+    
+    assignment_group = data.get('assignment_group')
+    #state = data.get('state')
+    
+    try:
+        updated_incident = update_incident_info_assignment_group(service_now_uri, username, password, incident_number, assignment_group)
+        return jsonify(updated_incident)
     except Exception as e:
         return jsonify({"error": str(e)}), 400
 
@@ -784,8 +1162,8 @@ def get_incident():
 def get_incidents_by_user_route():
     data = request.get_json()
     service_now_uri = data.get('service_now_uri')
-    username = "AppDynamicAlert"
-    password = "appdynamics01"
+    username = service_now_username
+    password = service_now_password
     assigned_to = data.get('assigned_to')
 
     try:

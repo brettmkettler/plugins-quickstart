@@ -1,6 +1,6 @@
 {
   "schema_version": "v1",
-  "name_for_human": "ServiceNow Incident Plugin",
+  "name_for_human": "Gemi - ServiceNow CoPilot",
   "name_for_model": "servicenow_incident",
   "description_for_human": "Plugin for retrieving ServiceNow incident details",
   "description_for_model": "Plugin for retrieving ServiceNow incident details",
@@ -12,7 +12,7 @@
     "url": "http://localhost:5003/openapi.yaml",
     "is_user_authenticated": false
   },
-  "logo_url": "http://localhost:5003/logo.png",
+  "logo_url": "https://i.imgur.com/toQbQb4.png",
   "contact_email": "brett.kettler@capgemini.com",
   "legal_info_url": "https://ai-plug.in/legal"
 }

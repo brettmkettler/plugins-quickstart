@@ -1,6 +1,9 @@
-# ChatGPT plugins quickstart
+# Todo
 
-Get a todo list ChatGPT plugin up and running in under 5 minutes using Python. If you do not already have plugin developer access, please [join the waitlist](https://openai.com/waitlist/plugins).
+1. Update recommendation to intelligently look through comments and pick relevant ones to use for recommendation.
+2. Relevancy Percentage update with text 50%, 70% instead of changing in code
+3. 
+4. 
 
 ## Setup
 

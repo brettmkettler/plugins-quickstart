@@ -1,6 +1,6 @@
 openapi: 3.0.3
 info:
-  title: ServiceNow Incident Plugin
+  title: ServiceNow Incident Plugin - HOSTED
   description: A plugin that retrieves incident information and can create incidents in ServiceNow.
   version: 1.0.0
 servers:
@@ -121,7 +121,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-/check-licensing-consumption:
+  /check-licensing-consumption:
     get:
       operationId: checkLicensingConsumption
       summary: Check licensing consumption
@@ -138,11 +138,63 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+  /update-incident-assigned_to:
+    post:
+      operationId: updateIncidentAssignedTo
+      summary: Update the incidents assigned_to field in ServiceNow
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateIncidentAssignedToRequest'
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UpdateIncidentResponse'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /update_incident_assignment_group:
+    post:
+      operationId: updateIncidentAssignmentGroup
+      summary: Update the incidents assignment_group field in ServiceNow
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateIncidentAssignmentGroupRequest'
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UpdateIncidentResponse'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
 components:
   schemas:
     CreateServiceRequestRequest:
       type: object
       properties:
+        requested_for:
+          type: string
+          description: The user the service request is being created for.
+        assignment_group:
+          type: string
+          description: Ask user for the assignment group the incident needs to be assigned to.
         short_description:
           type: string
           description: A brief description of the service request.
@@ -232,6 +284,11 @@ components:
         recommendation:
           type: string
           description: The generated recommendation.
+        relevant_tickets:
+          type: array
+          items:
+            type: string
+          description: The relevant tickets.
     GetSLATimeRequest:
       type: object
       properties:
@@ -267,6 +324,30 @@ components:
           used_license_units:
             type: integer
             description: The used license units.
+    UpdateIncidentAssignedToRequest:
+      type: object
+      properties:
+        incident_number:
+          type: string
+          description: The number of the incident to update.
+        assigned_to:
+          type: string
+          description: The person or group to assign the incident to.
+    UpdateIncidentAssignmentGroupRequest:
+      type: object
+      properties:
+        incident_number:
+          type: string
+          description: The number of the incident to update.
+        assignment_group:
+          type: string
+          description: The assignment group to assign the incident to.
+    UpdateIncidentResponse:
+      type: object
+      properties:
+        message:
+          type: string
+          description: The response message.
     Error:
       type: object
       properties:
