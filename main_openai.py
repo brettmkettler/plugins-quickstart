@@ -12,26 +12,10 @@ import openai
 import numpy as np
 import spacy
 import keys
-import time
-import tiktoken
 
-# Delete the token_count.txt file to reset the token count
-try:
-    os.remove("token_count.txt")
-except:
-    print("No token count file found")
-    
+openai.api_key = keys.openai_key
 
-## OPENAI API KEY
-# openai.api_key = keys.openai_key
 
-## AZURE API KEY
-openai.api_type = "azure"
-openai.api_base = "https://capopenai.openai.azure.com/"
-openai.api_version = "2022-12-01"
-openai.api_key = "ea2f93c26b9841e387700aa442f06f9c"
-azure_engine = "Gemi_AI"
-#azure_engine = "text-davinci-003"
 
 # Simlar: ['INC2059792', 'INC2054440', 'INC2054435', 'INC2054429'
 
@@ -48,9 +32,9 @@ service_now_uri_main = "https://sncapappsonedev.service-now.com"
 service_now_username = "gemi_ai"
 service_now_password = "Gemi_AI23!!!!"
 
-# service_now_uri_main = "https://rydersystemsdev.service-now.com"
-# service_now_username = "AppDynamicAlert"
-# service_now_password = "appdynamics01"
+#service_now_uri = "https://rydersystemsdev.service-now.com"
+#service_now_username = "AppDynamicAlert"
+#service_now_password = "appdynamics01"
 
 
 app = Flask(__name__)
@@ -59,38 +43,6 @@ CORS(app)
 
 ##################### MODULES ##############################
 
-TOKEN_FILE = "token_count.txt"
-
-def num_tokens_from_string(string: str, encoding_name: str = "cl100k_base") -> int:
-    """Returns the number of tokens in a text string."""
-    encoding = tiktoken.get_encoding(encoding_name)
-    num_tokens = len(encoding.encode(string))
-    return num_tokens
-
-def get_cumulative_tokens():
-    try:
-        with open(TOKEN_FILE, "r") as f:
-            return int(f.read().strip())
-    except FileNotFoundError:
-        return 0
-
-def update_cumulative_tokens(new_tokens):
-    total_tokens = get_cumulative_tokens() + new_tokens
-    with open(TOKEN_FILE, "w") as f:
-        f.write(str(total_tokens))
-    return total_tokens
-
-
-#####
-# Place inside where you want to count tokens
-# tokens = num_tokens_from_string(script)
-# total_tokens = update_cumulative_tokens(tokens)
-# print(f"The script consumes {tokens} tokens.")
-
-# Place at end of script to total tokens
-# total_tokens = update_cumulative_tokens(tokens)
-# print(f"The script consumes {tokens} tokens.")
-# print(f"Total tokens used so far: {total_tokens}")
 
 ############################################################
 ############### APP DYNAMICS API CREDENTIALS ###############
@@ -185,7 +137,6 @@ def summarize_incident_comments(comments, work_notes, comments_and_work_notes, c
     print(f'Resolved by: {incident_resolvedby}')
     print(f'Priority: {incident_priority}')
 
-
     incident_prompt = (
         "How would you summarize the work notes and comments please provide a very detailed 2 paragraph solution with steps on how to fix the issue. You will answer the question each time like the issue is not already resolved and put the name of the person who resolved the issue at the end. Finally, put the priority of the incident at the end of the paragraph. \n"
         + "\n"
@@ -206,44 +157,16 @@ def summarize_incident_comments(comments, work_notes, comments_and_work_notes, c
         + "Recommendation: "
         )
 
-    ## OPENAI API RESPONSE
-    # Generate recommendation using OpenAI
-    # response = openai.Completion.create(
-    #     engine="text-davinci-003",
-    #     prompt=incident_prompt,
-    #     max_tokens=1000,
-    #     n=1,
-    #     stop=None,
-    #     temperature=0.3
-    #     )
-    
-    ## AZURE API RESPONSE
-    ## AZURE API KEY
-    openai.api_type = "azure"
-    openai.api_base = "https://capopenai.openai.azure.com/"
-    openai.api_version = "2022-12-01"
-    openai.api_key = "ea2f93c26b9841e387700aa442f06f9c"
 
+    # Generate recommendation using OpenAI
     response = openai.Completion.create(
-        engine=azure_engine,
+        engine="text-davinci-003",
         prompt=incident_prompt,
-        temperature=0.5,
         max_tokens=1000,
-        top_p=0.5,
-        frequency_penalty=0.13,
-        presence_penalty=0.13
-        #stop=["\n", "Recommendation:"]
-    )
-    
-    tokens = num_tokens_from_string(incident_prompt)
-    total_tokens = update_cumulative_tokens(tokens)
-    print(f"The script consumes {tokens} tokens.")
-    
-    
-    ###################
-    # Ask a series of questions about the data
-    
-    
+        n=1,
+        stop=None,
+        temperature=0.3
+        )
     
     summarize = response.choices[0].text.strip()
     print("Summarized Resolution: " + summarize)
@@ -397,8 +320,6 @@ def create_service_request(service_now_uri, username, password, short_descriptio
 #             raise Exception("SLA not found or API response empty")
 #     else:
 #         raise Exception(f"Error: {response.status_code}, {response.text}")
-
-
 def get_assignmentgroup(service_now_uri, username, password, plain_text_name):
     service_now_uri = service_now_uri_main
     url = f"{service_now_uri}/api/now/table/sys_user_group"
@@ -663,95 +584,20 @@ def get_incident_info_with_recommendation(service_now_uri, username, password, i
             #incident["work_notes"] = work_notes
             #incident["comments"] = comments
             
-            relatedinfo = "Provide a general recommendation for this incident."
-            
-            print("Common Issues Resolution notes: " + str(relatedinfo))
-            
-            
-            ########################################
-            # Self Reflection (WIP)
-            ########################################
-            
-            question1 = f"What is this ticket about? Provide a single word of what this incident is about given the description: {description}"
-            
-            # # Generate recommendation using OpenAI
-            # self_question1 = openai.Completion.create(
-            #     engine="text-davinci-003",
-            #     prompt=question1,
-            #     max_tokens=1000,
-            #     n=1,
-            #     stop=None,
-            #     temperature=0.3
-            # )
-            
-            ## AZURE API RESPONSE
-            self_question1 = openai.Completion.create(
-                engine=azure_engine,
-                prompt=question1,
-                temperature=0.5,
-                max_tokens=500,
-                top_p=0.5,
-                frequency_penalty=0.13,
-                presence_penalty=0.13
-                #stop=["\n", "Recommendation:"]
-            )
-            
-            
-            
-            reflection = (
-                f"Generate a list of questions that a support person would ask themselves to resolve a incident that is about: {self_question1}. Then answer the questions in a numbered list format given all the details of the ticket below:"
-                + "\n"
-                + "Incident Description: "
-                + description
-                + "\n"
-                + "Work Notes: "
-                + str(work_notes)
-                + "\n"
-                + "Comments and Work Notes: "
-                + str(comments_and_work_notes)
-                + "\n"
-                + "Comments:"
-                + str(comments)
-                + "\n"
-                + "\nReflection:"
-            )
-
-            print("Reflection Prompt: " + reflection)
-
-            # Generate recommendation using OpenAI
-            # self_reflection = openai.Completion.create(
-            #     engine="text-davinci-003",
-            #     prompt=reflection,
-            #     max_tokens=1000,
-            #     n=1,
-            #     stop=None,
-            #     temperature=0.3
-            # )
-            
-            ## AZURE API RESPONSE
-            self_reflection = openai.Completion.create(
-                engine=azure_engine,
-                prompt=reflection,
-                temperature=0.5,
-                max_tokens=200,
-                top_p=0.5,
-                frequency_penalty=0.13,
-                presence_penalty=0.13
-                #stop=["\n", "Recommendation:"]
-            )
-            
-            self_reflection = self_reflection.choices[0].text.strip()
-            
-            print("REFLECTION: " + self_reflection)
-            
-            
             ########################################
             # Get relevant information from incident
             ########################################
             
-            print("=================================")
             
+            #cmdb_item = get_cmdb_item_from_incident(incident_number)
             
+            #incidents = fetch_related_incidents(cmdb_item)
+            
+            #relatedinfo = analyze_incidents(description, incidents)
+            
+            relatedinfo = "Provide a general recommendation for this incident."
+            
+            print("Common Issues Resolution notes: " + str(relatedinfo))
             # 
             # Check the work notes to see if the someone has already fixed the item.
             incident_prompt = (
@@ -777,26 +623,14 @@ def get_incident_info_with_recommendation(service_now_uri, username, password, i
             print("Incident Prompt: " + incident_prompt)
 
             # Generate recommendation using OpenAI
-            # response = openai.Completion.create(
-            #     engine="text-davinci-003",
-            #     prompt=incident_prompt,
-            #     max_tokens=1000,
-            #     n=1,
-            #     stop=None,
-            #     temperature=0.3
-            # )
-            
             response = openai.Completion.create(
-                engine=azure_engine,
+                engine="text-davinci-003",
                 prompt=incident_prompt,
-                temperature=0.5,
-                max_tokens=1500, ## TOKEN ISSUES
-                top_p=0.5,
-                frequency_penalty=0.13,
-                presence_penalty=0.13
-                #stop=["\n", "Recommendation:"]
+                max_tokens=1000,
+                n=1,
+                stop=None,
+                temperature=0.3
             )
-            
             recommendation = response.choices[0].text.strip()
 
             # Add recommendation to incident information
@@ -904,31 +738,14 @@ def get_entity_incidents(username, password, description):
     )
     
     # Generate recommendation using OpenAI
-    # response = openai.Completion.create(
-    #     engine="text-davinci-003",
-    #     prompt=keyword_prompt,
-    #     max_tokens=1000,
-    #     n=1,
-    #     stop=None,
-    #     temperature=0.1
-    # )
-    
     response = openai.Completion.create(
-                engine=azure_engine,
-                prompt=keyword_prompt,
-                temperature=0.5,
-                max_tokens=500,
-                top_p=0.5,
-                frequency_penalty=0.13,
-                presence_penalty=0.13
-                #stop=["\n", "Recommendation:"]
-            )
-    
-    tokens = num_tokens_from_string(keyword_prompt)
-    total_tokens = update_cumulative_tokens(tokens)
-    print(f"The script consumes {tokens} tokens.")
-    
-    
+        engine="text-davinci-003",
+        prompt=keyword_prompt,
+        max_tokens=1000,
+        n=1,
+        stop=None,
+        temperature=0.1
+    )
     keywords = response
     
     print(f"keywords: {keywords}")
@@ -995,32 +812,14 @@ def get_suggestedpriority(incidents_raw):
     )
     
     # Generate recommendation using OpenAI
-    # response = openai.Completion.create(
-    #     engine="text-davinci-003",
-    #     prompt=keyword_prompt,
-    #     max_tokens=1000,
-    #     n=1,
-    #     stop=None,
-    #     temperature=0.1
-    # )
-    
-    ## AZURE API RESPONSE
     response = openai.Completion.create(
-                engine=azure_engine,
-                prompt=keyword_prompt,
-                temperature=0.5,
-                max_tokens=500,
-                top_p=0.5,
-                frequency_penalty=0.13,
-                presence_penalty=0.13
-                #stop=["\n", "Recommendation:"]
-            )
-    
-    tokens = num_tokens_from_string(keyword_prompt)
-    total_tokens = update_cumulative_tokens(tokens)
-    print(f"The script consumes {tokens} tokens.")
-    
-    
+        engine="text-davinci-003",
+        prompt=keyword_prompt,
+        max_tokens=1000,
+        n=1,
+        stop=None,
+        temperature=0.1
+    )
     suggested_priority = response.choices[0].text.strip()
     
     print(f"Suggested Priority: {suggested_priority}")
@@ -1048,11 +847,6 @@ def generate_recommendation(username, password, description, work_notes, comment
     suggested_priority_list = relevantinfodata[2]
     
     suggested_priority = get_suggestedpriority(suggested_priority_list)    
-    
-    ##### TO DO #########
-    # Put the highest similarity score in the suggested_priority variable
-    #
-    ##################
     
     if priority == suggested_priority:
         suggested_response = f"Priority is correct. Continuing with recommendation as the ticket is already at the correct priority of {priority}."
@@ -1089,37 +883,17 @@ def generate_recommendation(username, password, description, work_notes, comment
         + "Recommendation:"
     )
 
-    #print("Incident Prompt: " + incident_prompt)
+    print("Incident Prompt: " + incident_prompt)
 
     # Generate recommendation using OpenAI
-    # response = openai.Completion.create(
-    #     engine="text-davinci-003",
-    #     prompt=incident_prompt,
-    #     max_tokens=1000,
-    #     n=1,
-    #     stop=None,
-    #     temperature=0.1
-    # )
-    
-    ## AZURE API RESPONSE
     response = openai.Completion.create(
-                engine=azure_engine,
-                prompt=incident_prompt,
-                temperature=0.2,
-                max_tokens=1500,
-                top_p=0.5,
-                frequency_penalty=0.13,
-                presence_penalty=0.13,
-                stop=["Recommendation:"]
-            )
-    
-    tokens = num_tokens_from_string(incident_prompt)
-    total_tokens = update_cumulative_tokens(tokens)
-    print(f"The script consumes {tokens} tokens.")
-    
-    print("=================================")
-    print("RAW Response: " + response.choices[0].text.strip())
-    
+        engine="text-davinci-003",
+        prompt=incident_prompt,
+        max_tokens=1000,
+        n=1,
+        stop=None,
+        temperature=0.1
+    )
     recommendation = response.choices[0].text.strip()
     
     relevant_tickets = relevantinfodata[1]
@@ -1224,10 +998,7 @@ def update_incident_info_assignment_group(service_now_uri, username, password, i
 ##########################################################################
 
 @app.route('/create-service-request', methods=['POST'])
-
 def create_service_request_route():
-    print(request.json)
-    
     data = request.get_json()
     service_now_uri = data.get('service_now_uri')
     username = service_now_username
@@ -1292,12 +1063,7 @@ def create_service_request_route():
 
 @app.route('/generate-recommendation', methods=['POST'])
 def generate_recommendation_route():
-    start_time = time.time()  # Record the start time
     data = request.get_json()
-    try:
-        os.remove("token_count.txt")
-    except:
-        print("No token count file found")
     
     incident_number = data.get('incident_number')
     service_now_uri = data.get('service_now_uri')
@@ -1319,7 +1085,6 @@ def generate_recommendation_route():
     print(f"Current Incident Priority: {priority}")
 
     try:
-        start_time = time.time()  # Record the start time
         # recommendation = generate_recommendation(username, password, description, work_notes, comments, relevantinfo, incident_number)
         # print(f"Recommendation: {recommendation}")
         # print(f"Recommendation: {recommendation.get('recommendation')}")
@@ -1327,20 +1092,11 @@ def generate_recommendation_route():
         # return jsonify({'recommendation': recommendation.get('recommendation')}, {'relevant_tickets': recommendation.get('relevant_tickets')})
         results = generate_recommendation(username, password, description, work_notes, comments, relevantinfo, incident_number, priority)
         
-        end_time = time.time()  # Record the end time in case of an exception
-        runtime = end_time - start_time  # Calculate the runtime in seconds
-        print("=================================")
-        print(f"Function runtime: {runtime:.2f} seconds")  # Print out the runtime
-        print("=================================")
-        
-        print(f"CHECK TOKENS IN FILE")
-        
         return jsonify({
             'recommendation': results.get('recommendation'),
             'relevant_tickets': results.get('relevant_tickets')
         })
     except Exception as e:
-                
         return jsonify({"error": str(e)}), 400
 
 

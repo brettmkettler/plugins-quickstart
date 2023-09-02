@@ -4,7 +4,7 @@ info:
   description: A plugin that retrieves incident information and can create incidents in ServiceNow.
   version: 1.0.0
 servers:
-  - url: http://localhost:5003
+  - url: http://127.0.0.1:5003
 paths:
   /create-service-request:
     post:
@@ -31,7 +31,7 @@ paths:
                 $ref: '#/components/schemas/Error'
   /get-incident:
     post:
-      operationId: submitIncident
+      operationId: get-incident-details
       summary: Retrieve general incident information
       requestBody:
         required: true
